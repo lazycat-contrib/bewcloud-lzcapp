@@ -1,0 +1,45 @@
+version: 1
+
+project:
+  root: .
+  build_config: lzc-build.yml
+  package_file: package.yml
+  output: dist/bewcloud.lpk
+  target_arch: amd64
+
+update:
+  strategy: publish
+  allow_downgrade: false
+  version_source:
+    type: image
+    image: website
+
+build:
+  toolchains: []
+  run_buildscript: false
+
+images:
+  # 镜像模式（delivery.mode=mirror）：只读校验，把 manifest 里的镜像改写成加速地址；
+  # 不把镜像搬到懒猫镜像源，因此也不能上官方商店。
+  # 版本源是 website（上游唯一频繁更新的服务）；postgres / radicale 跟随 compose 固定版本，
+  # 需要升级时手动改 manifest 里这两个镜像的 tag。
+  - id: website
+    target: service
+    service: website
+    source: ghcr.io/bewcloud/bewcloud
+    channel: stable
+    sort: semver
+    # 只跟 vX.Y.Z 正式版（排除 latest / dev 等）
+    tag_regex: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+    delivery:
+      mode: mirror
+      require_digest_match: true
+
+stores:
+  official:
+    enabled: false
+  private:
+    enabled: true
+    skip_if_version_exists: true
+    name: bewCloud
+    summary: "bewCloud 懒猫微服打包：Deno 个人云（文件/RSS/笔记/相册/记账/日历/联系人），三容器：website + PostgreSQL + Radicale。"

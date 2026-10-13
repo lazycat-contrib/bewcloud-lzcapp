@@ -1,0 +1,18 @@
+package: cloud.lazycat.app.bewcloud
+version: 4.19.0
+name: bewCloud
+description: "Personal cloud built with Deno — dashboard, files (WebDAV), news RSS, notes, photos, expenses, contacts and calendar (CalDav/CardDav via Radicale), backed by PostgreSQL. AGPL-3.0."
+min_os_version: 1.5.0
+homepage: https://github.com/bewcloud/bewcloud
+author: bewcloud
+license: AGPL-3.0
+locales:
+  zh:
+    name: "bewCloud"
+    description: "Deno 编写的个人云：仪表盘、文件（WebDAV）、新闻 RSS、笔记、相册、记账、联系人与日历（Radicale 提供 CalDav/CardDav），PostgreSQL 存储。"
+  zh_CN:
+    name: "bewCloud"
+    description: "Deno 编写的个人云：仪表盘、文件（WebDAV）、新闻 RSS、笔记、相册、记账、联系人与日历（Radicale 提供 CalDav/CardDav），PostgreSQL 存储。"
+  en:
+    name: "bewCloud"
+    description: "Personal cloud built with Deno — dashboard, files (WebDAV), news RSS, notes, photos, expenses, contacts and calendar, backed by PostgreSQL."

@@ -1,0 +1,23 @@
+params:
+    - id: allow_signups
+      type: bool
+      name: "Allow signups"
+      description: "Off (default): only the first registered account (the admin) can sign up. On: anyone who can reach the domain can create an account."
+      default_value: false
+      optional: true
+
+locales:
+    zh:
+        allow_signups:
+            name: "允许注册"
+            description: "关闭（默认）：只有第一个注册的账号（即管理员）能注册。打开：所有能访问本应用域名的人都可以注册账号。"
+
+    zh_CN:
+        allow_signups:
+            name: "允许注册"
+            description: "关闭（默认）：只有第一个注册的账号（即管理员）能注册。打开：所有能访问本应用域名的人都可以注册账号。"
+
+    en:
+        allow_signups:
+            name: "Allow signups"
+            description: "Off (default): only the first account (admin) can register. On: anyone reaching the domain can sign up."

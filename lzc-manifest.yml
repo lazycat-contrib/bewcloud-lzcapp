@@ -1,0 +1,156 @@
+application:
+  subdomain: bewcloud
+  multi_instance: false
+  upstreams:
+    - location: /
+      backend: http://website:8000
+  # 入口放行（不过微服账号）：bewcloud 自带账号体系，首位注册者即管理员，
+  # 之后注册默认关闭（allowSignups=false，安装向导可开）
+  public_path:
+    - /
+services:
+  website:
+    # 镜像模式：Action 只读校验后把这行改写成加速地址（GHCR → ghcr.1ms.run）
+    # upstream: ghcr.io/bewcloud/bewcloud:v4.19.0
+    image: ghcr.1ms.run/bewcloud/bewcloud:v4.19.0
+    # 镜像默认 USER deno(1993)，/app 属主 deno。
+    # setup_script 以 root 每次启动先执行（官方语义：root 跑完再走原 entrypoint）：
+    #  1) 生成 bewcloud.config.ts（baseUrl=本应用微服域名，注册开关按向导参数）
+    #  2) chown 给 deno，保持原 USER 的写权限
+    #  3) 等 PostgreSQL 可连接（depends_on 健康检测已保证，这里再兜底重试），
+    #     跑 make migrate-db 补齐缺失迁移（上游设计为手动跑，这里自动化；
+    #     幂等：已执行过的迁移会跳过）
+    setup_script: |
+      set -e
+      mkdir -p /app/data-files
+      cat > /app/bewcloud.config.ts <<'EOF'
+      import { Config, PartialDeep } from './lib/types.ts';
+
+      const config: PartialDeep<Config> = {
+        auth: {
+          baseUrl: 'https://{{ .S.AppDomain }}',
+          allowSignups: {{ .U.allow_signups }},
+          enableForeverSignup: true,
+        },
+        contacts: {
+          enableCardDavServer: true,
+          cardDavUrl: 'http://radicale:5232',
+        },
+        calendar: {
+          enableCalDavServer: true,
+          calDavUrl: 'http://radicale:5232',
+        },
+      };
+
+      export default config;
+      EOF
+      chown deno:deno /app/bewcloud.config.ts
+      # 等数据库可连接（最多约 2 分钟），然后补跑缺失的迁移
+      i=0
+      until deno eval 'try { const c = await Deno.connect({hostname:"postgresql",port:5432}); c.close(); } catch { Deno.exit(1); }' 2>/dev/null; do
+        i=$((i+1)); [ $i -gt 60 ] && echo "postgresql 一直未就绪，跳过迁移（应用可能无法启动）" && break
+        sleep 2
+      done
+      if [ $i -le 60 ]; then
+        su deno -s /bin/sh -c 'cd /app && make migrate-db' || echo "migrate-db 失败（应用将继续启动）"
+      fi
+    environment:
+      # 上游 lib/interfaces/database.ts 等直接读容器 env（@std/dotenv/load 只是
+      # 兜底），与 postgres 服务的密码用同一个 stable_secret，天然一致
+      - POSTGRESQL_HOST=postgresql
+      - POSTGRESQL_USER=postgres
+      - POSTGRESQL_PASSWORD={{ stable_secret "db_password" }}
+      - POSTGRESQL_DBNAME=bewcloud
+      - POSTGRESQL_PORT=5432
+      - JWT_SECRET={{ stable_secret "jwt_secret" }}
+      - PASSWORD_SALT={{ stable_secret "password_salt" }}
+      - MFA_KEY={{ stable_secret "mfa_key" }}
+      - MFA_SALT={{ stable_secret "mfa_salt" }}
+    depends_on:
+      - postgresql
+      - radicale
+    healthcheck:
+      # deno ubuntu 镜像里没有 curl/wget，用 deno 自身探测（应用任意响应都算活着）
+      test:
+        - CMD-SHELL
+        - deno eval 'const r = await fetch("http://127.0.0.1:8000/"); if (!r) Deno.exit(1);' || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 180s
+    binds:
+      # 用户上传文件（files 应用）持久化；rootfs 会丢，必须 bind
+      - /lzcapp/var/bewcloud:/app/data-files
+    mem_limit: 512M
+
+  postgresql:
+    # 镜像模式：Action 校验后改写（Docker Hub → docker.1ms.run）
+    # upstream: postgres:18.6
+    image: docker.1ms.run/library/postgres:18.6
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD={{ stable_secret "db_password" }}
+      - POSTGRES_DB=bewcloud
+    # 官方 postgres 镜像 Entrypoint docker-entrypoint.sh 会以 root 起再 su 到
+    # postgres 用户；PGDATA=/var/lib/postgresql/18/docker bind 到 /lzcapp/var 持久化。
+    # 平台建的 /lzcapp/var/postgresql 属主是 root，官方 entrypoint 会自行 chown，
+    # 无需干预。
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d bewcloud
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    binds:
+      - /lzcapp/var/postgresql:/var/lib/postgresql/18/docker
+    mem_limit: 512M
+    shm_size: 128M
+
+  radicale:
+    # 镜像模式：Action 校验后改写（Docker Hub → docker.1ms.run）
+    # upstream: tomsquest/docker-radicale:3.7.6.0
+    image: docker.1ms.run/tomsquest/docker-radicale:3.7.6.0
+    # bewcloud 通过 http://radicale:5232 内网反代 CardDav/CalDav（鉴权由 bewcloud
+    # 注入 X-Remote-User）。镜像 ENTRYPOINT 自带：
+    #  - TAKE_FILE_OWNERSHIP=true → root 启动时自动 chown -R radicale:radicale /data
+    #  - RADICALE_CONFIG_* 环境变量自动改写 /config/config
+    # 用包内 contentdir 提供 radicale 配置（http_x_remote_user 鉴权）
+    environment:
+      - TAKE_FILE_OWNERSHIP=true
+    healthcheck:
+      # 镜像基于 alpine，有 wget（busybox 版）
+      test:
+        - CMD-SHELL
+        - wget -q -O /dev/null http://127.0.0.1:5232/ || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    binds:
+      - /lzcapp/var/radicale:/data
+      - /lzcapp/pkg/content/radicale-config:/config:ro
+    mem_limit: 256M
+usage: |
+  bewCloud 是 Deno 编写的个人云：仪表盘 / 文件（WebDAV）/ 新闻 RSS / 笔记 /
+  相册 / 记账 / 联系人 / 日历（CardDav/CalDav 走 Radicale）。
+
+  【首次使用】
+  打开应用域名注册第一个账号——首位注册者自动成为管理员。之后是否开放注册由
+  安装向导的「允许注册」决定（默认关闭）。
+
+  【数据库迁移】
+  上游设计为手动 make migrate-db（每次版本升级后要重跑）。本包在每次启动时
+  自动补跑缺失的迁移（setup_script 等 PostgreSQL 就绪后执行，幂等），首次
+  安装与升级都无需手动操作。
+
+  【数据】
+  - 用户文件：/lzcapp/var/bewcloud
+  - PostgreSQL 数据：/lzcapp/var/postgresql
+  - 日历/联系人：/lzcapp/var/radicale
+  升级不丢。数据库密码与各密钥由微服 stable_secret 稳定生成，不会因重启改变。
+
+  【注意】
+  - Radicale 不对外暴露端口，仅由 bewcloud 内网反代。
+  - 界面语言跟随浏览器；数据库与应用容器均为 UTC。

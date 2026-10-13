@@ -1,0 +1,16 @@
+# -*- mode: conf -*-
+# Radicale 配置（bewcloud 打包版）：
+# 鉴权 http_x_remote_user —— bewcloud 反代 /dav 时注入 X-Remote-User 头，
+# radicale 自身不做密码校验（不对外暴露端口，仅容器网络内可达）。
+
+[server]
+hosts = 0.0.0.0:5232
+
+[auth]
+type = http_x_remote_user
+
+[storage]
+filesystem_folder = /data/collections
+
+[rights]
+type = owner_only
