@@ -1,5 +1,5 @@
 package: cloud.lazycat.app.bewcloud
-version: 4.19.0
+version: 4.20.0
 name: bewCloud
 description: "Personal cloud built with Deno — dashboard, files (WebDAV), news RSS, notes, photos, expenses, contacts and calendar (CalDav/CardDav via Radicale), backed by PostgreSQL. AGPL-3.0."
 min_os_version: 1.5.0

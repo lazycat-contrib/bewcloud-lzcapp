@@ -11,8 +11,8 @@ application:
 services:
   website:
     # 镜像模式：Action 只读校验后把这行改写成加速地址（GHCR → ghcr.1ms.run）
-    # upstream: ghcr.io/bewcloud/bewcloud:v4.19.0
-    image: ghcr.1ms.run/bewcloud/bewcloud:v4.19.0
+    # upstream: ghcr.io/bewcloud/bewcloud:v4.20.0
+    image: ghcr.1ms.run/bewcloud/bewcloud:v4.20.0
     # 镜像默认 USER deno(1993)，/app 属主 deno。
     # setup_script 以 root 每次启动先执行（官方语义：root 跑完再走原 entrypoint）：
     #  1) 生成 bewcloud.config.ts（baseUrl=本应用微服域名，注册开关按向导参数）
@@ -82,7 +82,6 @@ services:
       # 用户上传文件（files 应用）持久化；rootfs 会丢，必须 bind
       - /lzcapp/var/bewcloud:/app/data-files
     mem_limit: 512M
-
   postgresql:
     # 镜像模式：Action 校验后改写（Docker Hub → docker.1ms.run）
     # upstream: postgres:18.6
@@ -107,7 +106,6 @@ services:
       - /lzcapp/var/postgresql:/var/lib/postgresql/18/docker
     mem_limit: 512M
     shm_size: 128M
-
   radicale:
     # 镜像模式：Action 校验后改写（Docker Hub → docker.1ms.run）
     # upstream: tomsquest/docker-radicale:3.7.6.0
