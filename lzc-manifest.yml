@@ -11,8 +11,8 @@ application:
 services:
   website:
     # 镜像模式：Action 只读校验后把这行改写成加速地址（GHCR → ghcr.1ms.run）
-    # upstream: ghcr.io/bewcloud/bewcloud:v4.20.0
-    image: ghcr.1ms.run/bewcloud/bewcloud:v4.20.0
+    # upstream: ghcr.io/bewcloud/bewcloud:v4.21.0
+    image: ghcr.1ms.run/bewcloud/bewcloud:v4.21.0
     # 镜像默认 USER deno(1993)，/app 属主 deno。
     # setup_script 以 root 每次启动先执行（官方语义：root 跑完再走原 entrypoint）：
     #  1) 生成 bewcloud.config.ts（baseUrl=本应用微服域名，注册开关按向导参数）
